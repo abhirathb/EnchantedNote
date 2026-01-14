@@ -107,70 +107,60 @@
   background: rgba(139, 126, 200, 0.2);
 }
 
-/* ===== Whisper Blocks - Margin/Gutter ===== */
-.enchanted-whisper-gutter {
-  position: absolute;
-  right: -280px;
-  width: 250px;
-  font-size: 0.85em;
-  color: var(--enchanted-whisper-color);
-  font-style: italic;
-  padding: 0.5em;
-  background: var(--background-secondary);
-  border-radius: 4px;
-  border-left: 2px solid var(--enchanted-whisper-color);
+/* ===== Whisper Icon ===== */
+.enchanted-whisper-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+  cursor: pointer;
   opacity: 0.7;
-  transition: opacity 0.2s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  z-index: 10;
-}
-
-.enchanted-whisper-gutter:hover {
-  opacity: 1;
-}
-
-/* Whisper in the CodeMirror gutter */
-.cm-enchanted-whisper-marker {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--enchanted-whisper-color);
-  cursor: pointer;
-  opacity: 0.6;
   transition: opacity 0.2s ease, transform 0.2s ease;
+  user-select: none;
+  vertical-align: middle;
+  margin-right: 4px;
 }
 
-.cm-enchanted-whisper-marker:hover {
+.enchanted-whisper-icon:hover {
   opacity: 1;
-  transform: scale(1.2);
+  transform: scale(1.15);
 }
 
-/* Whisper tooltip */
-.enchanted-whisper-tooltip {
-  position: absolute;
-  right: 20px;
+/* Whisper popover - shown on hover/tap */
+.enchanted-whisper-popover {
+  position: fixed;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--enchanted-whisper-color);
   border-radius: 6px;
-  padding: 0.5em 0.75em;
+  padding: 0.75em 1em;
   font-size: 0.9em;
   color: var(--enchanted-whisper-color);
   font-style: italic;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   max-width: 300px;
-  z-index: 100;
+  z-index: 1000;
+  animation: enchanted-popover-in 0.15s ease-out;
 }
 
-/* ===== Inline Whisper (in document) ===== */
-.enchanted-whisper-inline {
-  font-size: 0.85em;
-  color: var(--enchanted-whisper-color);
-  font-style: italic;
-  padding: 0.2em 0.5em;
-  background: rgba(91, 138, 138, 0.1);
-  border-radius: 3px;
-  margin-left: 0.5em;
+@keyframes enchanted-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Inline whisper widget (replaces ::whisper[...]::) */
+.enchanted-whisper-inline-widget {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
 }
 
 /* ===== Stowed/Collapsed State ===== */

@@ -1,24 +1,23 @@
-import {
-  App,
-  Plugin,
-  PluginManifest,
-  MarkdownView,
-} from 'obsidian';
+import { App, Plugin, MarkdownView } from 'obsidian';
 import { Extension } from '@codemirror/state';
 import { ViewPlugin, ViewUpdate, EditorView } from '@codemirror/view';
 
-import { EnchantedNotesSettings, DEFAULT_SETTINGS, DeveloperStats } from './types';
+import { EnchantedNotesSettings, DEFAULT_SETTINGS, DeveloperStats, ProviderType } from './types';
 import { EnchantedNotesSettingTab } from './settings';
-import { ClaudeClient } from './api/claude';
+import { LLMProvider } from './api/provider';
+import { ClaudeProvider } from './api/claude';
+import { OllamaProvider } from './api/ollama';
 import { MuseMode } from './modes/muse';
 import { WhisperMode } from './modes/whisper';
 import { registerCommands } from './commands';
 import { createMuseDecorator, clearStowedState } from './rendering/muse-decorator';
-import { createWhisperGutter, createWhisperDecorator } from './rendering/whisper-gutter';
+import { createWhisperWidget } from './rendering/whisper-widget';
 
 export default class EnchantedNotesPlugin extends Plugin {
   settings: EnchantedNotesSettings = DEFAULT_SETTINGS;
-  claudeClient: ClaudeClient | null = null;
+  provider: LLMProvider | null = null;
+  private claudeProvider: ClaudeProvider | null = null;
+  private ollamaProvider: OllamaProvider | null = null;
   private museMode: MuseMode | null = null;
   private whisperMode: WhisperMode | null = null;
   private editorExtensions: Extension[] = [];
@@ -29,24 +28,12 @@ export default class EnchantedNotesPlugin extends Plugin {
     // Load settings
     await this.loadSettings();
 
-    // Initialize Claude client
-    this.claudeClient = new ClaudeClient(
-      this.settings.apiKey,
-      this.settings.model
-    );
+    // Initialize providers
+    this.initializeProviders();
 
     // Initialize modes
-    this.museMode = new MuseMode(
-      this.app,
-      this.claudeClient,
-      this.settings
-    );
-
-    this.whisperMode = new WhisperMode(
-      this.app,
-      this.claudeClient,
-      this.settings
-    );
+    this.museMode = new MuseMode(this.app, this.provider!, this.settings);
+    this.whisperMode = new WhisperMode(this.app, this.provider!, this.settings);
 
     // Enable modes based on default settings
     if (this.settings.defaultStyle === 'muse') {
@@ -56,12 +43,7 @@ export default class EnchantedNotesPlugin extends Plugin {
     }
 
     // Register commands
-    registerCommands(
-      this.app,
-      (cmd) => this.addCommand(cmd),
-      this.museMode,
-      this.whisperMode
-    );
+    registerCommands(this.app, (cmd) => this.addCommand(cmd), this.museMode, this.whisperMode);
 
     // Add settings tab
     this.addSettingTab(new EnchantedNotesSettingTab(this.app, this));
@@ -74,42 +56,82 @@ export default class EnchantedNotesPlugin extends Plugin {
   }
 
   /**
+   * Initialize LLM providers
+   */
+  private initializeProviders(): void {
+    // Initialize Claude provider
+    this.claudeProvider = new ClaudeProvider(
+      this.settings.claudeApiKey,
+      this.settings.claudeModel
+    );
+
+    // Initialize Ollama provider
+    this.ollamaProvider = new OllamaProvider(
+      this.settings.ollamaBaseUrl,
+      this.settings.ollamaModel
+    );
+
+    // Set active provider based on settings
+    this.provider =
+      this.settings.provider === 'claude' ? this.claudeProvider : this.ollamaProvider;
+  }
+
+  /**
+   * Switch to a different provider
+   */
+  switchProvider(providerType: ProviderType): void {
+    this.provider = providerType === 'claude' ? this.claudeProvider : this.ollamaProvider;
+
+    // Update modes with new provider
+    this.museMode?.setProvider(this.provider!);
+    this.whisperMode?.setProvider(this.provider!);
+  }
+
+  /**
+   * Update provider configuration
+   */
+  updateProviderConfig(): void {
+    if (this.settings.provider === 'claude' && this.claudeProvider) {
+      this.claudeProvider.setApiKey(this.settings.claudeApiKey);
+      this.claudeProvider.setModel(this.settings.claudeModel);
+    } else if (this.settings.provider === 'ollama' && this.ollamaProvider) {
+      this.ollamaProvider.setBaseUrl(this.settings.ollamaBaseUrl);
+      this.ollamaProvider.setModel(this.settings.ollamaModel);
+    }
+  }
+
+  /**
+   * Test connection to current provider
+   */
+  async testConnection(): Promise<boolean> {
+    if (!this.provider) {
+      return false;
+    }
+    return this.provider.testConnection();
+  }
+
+  /**
+   * Fetch available Ollama models
+   */
+  async fetchOllamaModels(): Promise<string[]> {
+    if (!this.ollamaProvider) {
+      return [];
+    }
+    return this.ollamaProvider.listModels();
+  }
+
+  /**
    * Register CodeMirror editor extensions
    */
   private registerEditorExtensions(): void {
     // Muse decorator for rendering muse blocks
     const museDecorator = createMuseDecorator();
 
-    // Whisper gutter and decorator
-    const whisperGutter = createWhisperGutter();
-    const whisperDecorator = createWhisperDecorator();
-
-    // Editor update handler for triggers
-    const triggerHandler = ViewPlugin.fromClass(
-      class {
-        constructor(private view: EditorView) {}
-
-        update(update: ViewUpdate) {
-          if (update.docChanged && this.plugin?.museMode) {
-            const triggerManager = this.plugin.museMode.getTriggerManager();
-            triggerManager.handleUpdate(update);
-          }
-        }
-
-        private get plugin(): EnchantedNotesPlugin | null {
-          // Access plugin through app
-          // @ts-ignore
-          return this.view.state.facet(pluginFacet)?.[0] || null;
-        }
-      }
-    );
+    // Whisper widget for hover/tap icons
+    const whisperWidget = createWhisperWidget();
 
     // Register extensions
-    this.registerEditorExtension([
-      museDecorator,
-      whisperGutter,
-      whisperDecorator,
-    ]);
+    this.registerEditorExtension([museDecorator, whisperWidget]);
   }
 
   /**
@@ -142,7 +164,7 @@ export default class EnchantedNotesPlugin extends Plugin {
 
       statusBarItem.empty();
 
-      const indicator = statusBarItem.createSpan({
+      statusBarItem.createSpan({
         cls: `enchanted-status-indicator ${statusClass}`,
       });
 
@@ -150,9 +172,7 @@ export default class EnchantedNotesPlugin extends Plugin {
     };
 
     // Update status periodically
-    this.registerInterval(
-      window.setInterval(updateStatus, 1000)
-    );
+    this.registerInterval(window.setInterval(updateStatus, 1000));
 
     // Initial update
     updateStatus();
@@ -188,20 +208,6 @@ export default class EnchantedNotesPlugin extends Plugin {
   }
 
   /**
-   * Update the Claude API key
-   */
-  updateApiKey(apiKey: string): void {
-    this.claudeClient?.setApiKey(apiKey);
-  }
-
-  /**
-   * Update the Claude model
-   */
-  updateModel(model: string): void {
-    this.claudeClient?.setModel(model);
-  }
-
-  /**
    * Update the pause duration
    */
   updatePauseDuration(seconds: number): void {
@@ -215,18 +221,20 @@ export default class EnchantedNotesPlugin extends Plugin {
    * Get developer stats
    */
   getStats(): DeveloperStats {
-    return this.claudeClient?.getStats() || {
-      tokensThisSession: 0,
-      tokensToday: 0,
-      lastResponseTime: 0,
-      currentContextSize: 0,
-    };
+    return (
+      this.provider?.getStats() || {
+        tokensThisSession: 0,
+        tokensToday: 0,
+        lastResponseTime: 0,
+        currentContextSize: 0,
+      }
+    );
   }
 
   /**
    * Reset session stats
    */
   resetSessionStats(): void {
-    this.claudeClient?.resetSessionStats();
+    this.provider?.resetSessionStats();
   }
 }

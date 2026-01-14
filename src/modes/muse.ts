@@ -1,33 +1,37 @@
 import { App, MarkdownView, Notice, TFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
-import { ClaudeClient } from '../api/claude';
+import { LLMProvider } from '../api/provider';
 import { TriggerManager } from '../detection/triggers';
 import { detectContext, getLinkedNotesContent } from '../detection/context';
-import { createMuseBlock, isInsideEnchantment } from '../utils/parser';
-import { ClaudeContext, EnchantedNotesSettings, Mood } from '../types';
+import { isInsideEnchantment, getCleanContent } from '../utils/parser';
+import { getSystemPrompt } from '../moods';
+import { EnchantedNotesSettings, Mood, LLMContext } from '../types';
 
 /**
  * Manages Muse mode - inline responses that appear in the note
  */
 export class MuseMode {
   private app: App;
-  private claudeClient: ClaudeClient;
+  private provider: LLMProvider;
   private settings: EnchantedNotesSettings;
   private triggerManager: TriggerManager;
   private isGenerating: boolean = false;
   private currentMood: Mood | 'auto' = 'auto';
 
-  constructor(
-    app: App,
-    claudeClient: ClaudeClient,
-    settings: EnchantedNotesSettings
-  ) {
+  constructor(app: App, provider: LLMProvider, settings: EnchantedNotesSettings) {
     this.app = app;
-    this.claudeClient = claudeClient;
+    this.provider = provider;
     this.settings = settings;
     this.triggerManager = new TriggerManager(settings.pauseDuration);
 
     this.setupTriggers();
+  }
+
+  /**
+   * Set the LLM provider
+   */
+  setProvider(provider: LLMProvider): void {
+    this.provider = provider;
   }
 
   /**
@@ -111,6 +115,35 @@ export class MuseMode {
   }
 
   /**
+   * Build the user message for the LLM
+   */
+  private buildUserMessage(context: LLMContext): string {
+    const cleanContent = getCleanContent(context.noteContent);
+
+    let message = '';
+
+    // Add linked notes context if available
+    if (context.linkedNotes && context.linkedNotes.length > 0) {
+      message += '## Linked Notes Context\n\n';
+      message += context.linkedNotes.join('\n\n');
+      message += '\n\n---\n\n';
+    }
+
+    message += '## Current Note\n\n';
+
+    if (context.style === 'muse' && context.cursorPosition !== undefined) {
+      // For Muse mode, include content up to cursor
+      message += cleanContent.substring(0, context.cursorPosition);
+      message += '\n\n[CURSOR POSITION - respond to what comes before this point]';
+    } else {
+      // For Whisper mode, include full content
+      message += cleanContent;
+    }
+
+    return message;
+  }
+
+  /**
    * Handle a trigger event (pause or double-enter)
    */
   private async handleTrigger(): Promise<void> {
@@ -143,9 +176,9 @@ export class MuseMode {
       return;
     }
 
-    // Check if API is configured
-    if (!this.claudeClient.isConfigured()) {
-      new Notice('Please configure your Claude API key in settings');
+    // Check if provider is configured
+    if (!this.provider.isConfigured()) {
+      new Notice('Please configure your LLM provider in settings');
       return;
     }
 
@@ -153,19 +186,13 @@ export class MuseMode {
 
     try {
       // Detect context
-      const detectedContext = detectContext(
-        this.app,
-        file,
-        content,
-        this.settings
-      );
+      const detectedContext = detectContext(this.app, file, content, this.settings);
 
       // Use mood override if set
-      const mood =
-        this.currentMood !== 'auto' ? this.currentMood : detectedContext.mood;
+      const mood = this.currentMood !== 'auto' ? this.currentMood : detectedContext.mood;
 
-      // Build context for Claude
-      const context: ClaudeContext = {
+      // Build context
+      const context: LLMContext = {
         noteContent: content,
         cursorPosition: cursorPos,
         mood,
@@ -182,16 +209,19 @@ export class MuseMode {
         );
       }
 
+      // Get system prompt and user message
+      const systemPrompt = getSystemPrompt(mood, 'muse');
+      const userMessage = this.buildUserMessage(context);
+
       // Insert placeholder while generating
-      const placeholderPos = cursorPos;
       editor.replaceRange('\n\n::muse[...]::  ', editor.offsetToPos(cursorPos));
 
       let streamedContent = '';
-      const startPos = placeholderPos + 2; // After the two newlines
 
       // Generate response with streaming
-      await this.claudeClient.generateMuseResponse(
-        context,
+      await this.provider.chat(
+        systemPrompt,
+        userMessage,
         (text) => {
           // Update the placeholder with streaming content
           streamedContent += text;
@@ -220,10 +250,10 @@ export class MuseMode {
       new Notice(`Muse error: ${error instanceof Error ? error.message : 'Unknown error'}`);
 
       // Remove the placeholder if there was an error
-      const content = editor.getValue();
-      const placeholderMatch = content.match(/::muse\[\.\.\.\]::/);
+      const currentContent = editor.getValue();
+      const placeholderMatch = currentContent.match(/::muse\[\.\.\.\]::/);
       if (placeholderMatch) {
-        const matchStart = content.indexOf(placeholderMatch[0]);
+        const matchStart = currentContent.indexOf(placeholderMatch[0]);
         const matchEnd = matchStart + placeholderMatch[0].length;
         editor.replaceRange('', editor.offsetToPos(matchStart), editor.offsetToPos(matchEnd));
       }

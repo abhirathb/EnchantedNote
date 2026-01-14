@@ -4,11 +4,21 @@ export type InteractionStyle = 'muse' | 'whisper';
 // Moods - what Claude says
 export type Mood = 'reflect' | 'think' | 'plan';
 
+// Provider type
+export type ProviderType = 'claude' | 'ollama';
+
 // Plugin settings interface
 export interface EnchantedNotesSettings {
-  // API Configuration
-  apiKey: string;
-  model: string;
+  // Provider Configuration
+  provider: ProviderType;
+
+  // Claude settings
+  claudeApiKey: string;
+  claudeModel: string;
+
+  // Ollama settings
+  ollamaBaseUrl: string;
+  ollamaModel: string;
 
   // Behavior
   defaultStyle: InteractionStyle | 'off';
@@ -22,8 +32,11 @@ export interface EnchantedNotesSettings {
 }
 
 export const DEFAULT_SETTINGS: EnchantedNotesSettings = {
-  apiKey: '',
-  model: 'claude-sonnet-4-20250514',
+  provider: 'claude',
+  claudeApiKey: '',
+  claudeModel: 'claude-sonnet-4-20250514',
+  ollamaBaseUrl: 'http://localhost:11434',
+  ollamaModel: '',
   defaultStyle: 'muse',
   defaultMood: 'auto',
   pauseDuration: 2,
@@ -41,8 +54,8 @@ export interface EnchantmentBlock {
   end: number;
 }
 
-// Context for Claude API calls
-export interface ClaudeContext {
+// Context for LLM API calls
+export interface LLMContext {
   noteContent: string;
   cursorPosition?: number;
   mood: Mood;

@@ -1,35 +1,39 @@
 import { App, MarkdownView, Notice, TFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
-import { ClaudeClient } from '../api/claude';
+import { LLMProvider } from '../api/provider';
 import { WhisperTriggerManager } from '../detection/triggers';
 import { detectContext, getLinkedNotesContent } from '../detection/context';
-import { createWhisperBlock } from '../utils/parser';
-import { addWhisper, clearAllWhispers } from '../rendering/whisper-gutter';
-import { ClaudeContext, EnchantedNotesSettings, Mood } from '../types';
+import { getCleanContent } from '../utils/parser';
+import { getSystemPrompt } from '../moods';
+import { addWhisper, clearAllWhispers } from '../rendering/whisper-widget';
+import { EnchantedNotesSettings, Mood, LLMContext } from '../types';
 
 /**
- * Manages Whisper mode - margin annotations that appear in the gutter
+ * Manages Whisper mode - hover/tap annotations that appear as icons
  */
 export class WhisperMode {
   private app: App;
-  private claudeClient: ClaudeClient;
+  private provider: LLMProvider;
   private settings: EnchantedNotesSettings;
   private triggerManager: WhisperTriggerManager;
   private isAnalyzing: boolean = false;
   private currentMood: Mood | 'auto' = 'auto';
   private lastParagraphAnalyzed: number = -1;
 
-  constructor(
-    app: App,
-    claudeClient: ClaudeClient,
-    settings: EnchantedNotesSettings
-  ) {
+  constructor(app: App, provider: LLMProvider, settings: EnchantedNotesSettings) {
     this.app = app;
-    this.claudeClient = claudeClient;
+    this.provider = provider;
     this.settings = settings;
     this.triggerManager = new WhisperTriggerManager();
 
     this.setupTriggers();
+  }
+
+  /**
+   * Set the LLM provider
+   */
+  setProvider(provider: LLMProvider): void {
+    this.provider = provider;
   }
 
   /**
@@ -88,6 +92,27 @@ export class WhisperMode {
   }
 
   /**
+   * Build the user message for the LLM
+   */
+  private buildUserMessage(context: LLMContext): string {
+    const cleanContent = getCleanContent(context.noteContent);
+
+    let message = '';
+
+    // Add linked notes context if available
+    if (context.linkedNotes && context.linkedNotes.length > 0) {
+      message += '## Linked Notes Context\n\n';
+      message += context.linkedNotes.join('\n\n');
+      message += '\n\n---\n\n';
+    }
+
+    message += '## Current Note\n\n';
+    message += cleanContent;
+
+    return message;
+  }
+
+  /**
    * Handle analysis trigger
    */
   private async handleAnalyze(): Promise<void> {
@@ -113,8 +138,8 @@ export class WhisperMode {
       return;
     }
 
-    // Check if API is configured
-    if (!this.claudeClient.isConfigured()) {
+    // Check if provider is configured
+    if (!this.provider.isConfigured()) {
       return; // Silently fail for whispers
     }
 
@@ -128,19 +153,13 @@ export class WhisperMode {
 
     try {
       // Detect context
-      const detectedContext = detectContext(
-        this.app,
-        file,
-        content,
-        this.settings
-      );
+      const detectedContext = detectContext(this.app, file, content, this.settings);
 
       // Use mood override if set
-      const mood =
-        this.currentMood !== 'auto' ? this.currentMood : detectedContext.mood;
+      const mood = this.currentMood !== 'auto' ? this.currentMood : detectedContext.mood;
 
-      // Build context for Claude
-      const context: ClaudeContext = {
+      // Build context
+      const context: LLMContext = {
         noteContent: content,
         mood,
         style: 'whisper',
@@ -156,16 +175,22 @@ export class WhisperMode {
         );
       }
 
-      // Generate whisper response
-      const whisper = await this.claudeClient.generateWhisperResponse(context);
+      // Get system prompt and user message
+      const systemPrompt =
+        getSystemPrompt(mood, 'whisper') +
+        '\n\nIMPORTANT: Only respond if you have something genuinely useful to observe. If not, respond with exactly "NO_WHISPER" and nothing else.';
+      const userMessage = this.buildUserMessage(context);
 
-      if (whisper) {
-        // Get the EditorView for gutter manipulation
+      // Generate whisper response
+      const whisper = await this.provider.generate(systemPrompt, userMessage);
+
+      if (whisper && whisper !== 'NO_WHISPER' && !whisper.includes('NO_WHISPER')) {
+        // Get the EditorView for widget manipulation
         // @ts-ignore - accessing internal API
         const cmEditor = view.editor.cm as EditorView;
 
         if (cmEditor) {
-          // Add whisper to gutter
+          // Add whisper icon at the paragraph
           const line = this.getLineForParagraph(content, paragraphToAnalyze);
           addWhisper(cmEditor, line, whisper);
         }
@@ -209,9 +234,7 @@ export class WhisperMode {
     }
 
     // Pick a paragraph that's different from the last one analyzed
-    const candidates = validParagraphs.filter(
-      (p) => p !== this.lastParagraphAnalyzed
-    );
+    const candidates = validParagraphs.filter((p) => p !== this.lastParagraphAnalyzed);
 
     if (candidates.length === 0) {
       // All paragraphs have been analyzed, pick the last one
