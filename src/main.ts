@@ -1,6 +1,6 @@
 import { App, Plugin, MarkdownView } from 'obsidian';
 import { Extension } from '@codemirror/state';
-import { ViewPlugin, ViewUpdate, EditorView } from '@codemirror/view';
+import { ViewPlugin, ViewUpdate } from '@codemirror/view';
 
 import { EnchantedNotesSettings, DEFAULT_SETTINGS, DeveloperStats, ProviderType } from './types';
 import { EnchantedNotesSettingTab } from './settings';
@@ -130,8 +130,28 @@ export default class EnchantedNotesPlugin extends Plugin {
     // Whisper widget for hover/tap icons
     const whisperWidget = createWhisperWidget();
 
+    // Trigger plugin to forward editor updates to MuseMode
+    const triggerPlugin = this.createTriggerPlugin();
+
     // Register extensions
-    this.registerEditorExtension([museDecorator, whisperWidget]);
+    this.registerEditorExtension([museDecorator, whisperWidget, triggerPlugin]);
+  }
+
+  /**
+   * Create a ViewPlugin that forwards editor updates to the trigger system
+   */
+  private createTriggerPlugin(): Extension {
+    const museMode = this.museMode;
+
+    return ViewPlugin.fromClass(
+      class {
+        update(update: ViewUpdate) {
+          if (update.docChanged && museMode) {
+            museMode.handleEditorUpdate(update);
+          }
+        }
+      }
+    );
   }
 
   /**

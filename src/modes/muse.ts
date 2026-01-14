@@ -1,5 +1,5 @@
 import { App, MarkdownView, Notice, TFile } from 'obsidian';
-import { EditorView } from '@codemirror/view';
+import { EditorView, ViewUpdate } from '@codemirror/view';
 import { LLMProvider } from '../api/provider';
 import { TriggerManager } from '../detection/triggers';
 import { detectContext, getLinkedNotesContent } from '../detection/context';
@@ -100,11 +100,14 @@ export class MuseMode {
   }
 
   /**
-   * Handle editor updates
+   * Handle editor updates from CodeMirror
    */
-  handleEditorUpdate(view: EditorView): void {
-    // This is called on each editor update
-    // The TriggerManager handles debouncing internally
+  handleEditorUpdate(update: ViewUpdate): void {
+    if (!this.triggerManager.isEnabled()) {
+      return;
+    }
+    // Forward the update to the trigger manager
+    this.triggerManager.handleUpdate(update);
   }
 
   /**

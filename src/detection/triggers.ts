@@ -72,22 +72,16 @@ export class TriggerManager {
       return false;
     }
 
-    const newContent = update.state.doc.toString();
-    const contentChanged = newContent !== this.lastContent;
-
-    if (!contentChanged) {
-      return false;
-    }
-
     // Check for double-enter
     if (this.checkDoubleEnter(update)) {
       return true;
     }
 
     // Reset pause timer on any change
+    // Note: We don't update lastContent here - that tracks what we've PROCESSED
+    // This allows hasNewContent() to correctly detect unprocessed changes
     this.resetPauseTimer();
 
-    this.lastContent = newContent;
     return false;
   }
 
