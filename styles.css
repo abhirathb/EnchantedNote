@@ -1,0 +1,318 @@
+/* Enchanted Notes - Magical Styling */
+
+/* ===== CSS Variables ===== */
+:root {
+  --enchanted-muse-color: #8B7EC8;
+  --enchanted-muse-color-light: #A99DD8;
+  --enchanted-whisper-color: #5B8A8A;
+  --enchanted-whisper-color-light: #7AA3A3;
+  --enchanted-border-color: rgba(139, 126, 200, 0.3);
+  --enchanted-glow: rgba(139, 126, 200, 0.15);
+}
+
+.theme-dark {
+  --enchanted-muse-color: #A99DD8;
+  --enchanted-muse-color-light: #BEB4E3;
+  --enchanted-whisper-color: #7AA3A3;
+  --enchanted-whisper-color-light: #8FB5B5;
+  --enchanted-border-color: rgba(169, 157, 216, 0.4);
+  --enchanted-glow: rgba(169, 157, 216, 0.2);
+}
+
+/* ===== Muse Blocks - Inline ===== */
+.enchanted-muse {
+  font-style: italic;
+  color: var(--enchanted-muse-color);
+  font-family: 'Spectral', 'Cormorant', Georgia, serif;
+  border-left: 2px solid var(--enchanted-border-color);
+  padding-left: 0.75em;
+  margin: 0.5em 0;
+  background: var(--enchanted-glow);
+  border-radius: 0 4px 4px 0;
+  display: inline-block;
+  position: relative;
+}
+
+.enchanted-muse::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    var(--enchanted-muse-color-light),
+    var(--enchanted-muse-color)
+  );
+}
+
+/* Muse block - multiline */
+.enchanted-muse-block {
+  font-style: italic;
+  color: var(--enchanted-muse-color);
+  font-family: 'Spectral', 'Cormorant', Georgia, serif;
+  border-left: 3px solid var(--enchanted-border-color);
+  padding: 0.75em 1em;
+  margin: 0.75em 0;
+  background: var(--enchanted-glow);
+  border-radius: 0 6px 6px 0;
+  display: block;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.enchanted-muse-block::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(
+    to bottom,
+    var(--enchanted-muse-color-light),
+    var(--enchanted-muse-color)
+  );
+}
+
+/* Dismiss button for muse blocks */
+.enchanted-muse-dismiss,
+.enchanted-muse-block-dismiss {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--enchanted-muse-color);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 14px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 50%;
+}
+
+.enchanted-muse:hover .enchanted-muse-dismiss,
+.enchanted-muse-block:hover .enchanted-muse-block-dismiss {
+  opacity: 0.7;
+}
+
+.enchanted-muse-dismiss:hover,
+.enchanted-muse-block-dismiss:hover {
+  opacity: 1 !important;
+  background: rgba(139, 126, 200, 0.2);
+}
+
+/* ===== Whisper Blocks - Margin/Gutter ===== */
+.enchanted-whisper-gutter {
+  position: absolute;
+  right: -280px;
+  width: 250px;
+  font-size: 0.85em;
+  color: var(--enchanted-whisper-color);
+  font-style: italic;
+  padding: 0.5em;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  border-left: 2px solid var(--enchanted-whisper-color);
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  z-index: 10;
+}
+
+.enchanted-whisper-gutter:hover {
+  opacity: 1;
+}
+
+/* Whisper in the CodeMirror gutter */
+.cm-enchanted-whisper-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--enchanted-whisper-color);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.cm-enchanted-whisper-marker:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+/* Whisper tooltip */
+.enchanted-whisper-tooltip {
+  position: absolute;
+  right: 20px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 0.5em 0.75em;
+  font-size: 0.9em;
+  color: var(--enchanted-whisper-color);
+  font-style: italic;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: 300px;
+  z-index: 100;
+}
+
+/* ===== Inline Whisper (in document) ===== */
+.enchanted-whisper-inline {
+  font-size: 0.85em;
+  color: var(--enchanted-whisper-color);
+  font-style: italic;
+  padding: 0.2em 0.5em;
+  background: rgba(91, 138, 138, 0.1);
+  border-radius: 3px;
+  margin-left: 0.5em;
+}
+
+/* ===== Stowed/Collapsed State ===== */
+.enchanted-stowed {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background: var(--enchanted-glow);
+  border: 1px solid var(--enchanted-border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  vertical-align: middle;
+  margin: 0 2px;
+}
+
+.enchanted-stowed::after {
+  content: '✨';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+}
+
+.enchanted-stowed:hover {
+  background: var(--enchanted-border-color);
+}
+
+/* ===== Streaming Animation ===== */
+.enchanted-streaming {
+  position: relative;
+}
+
+.enchanted-streaming::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: var(--enchanted-muse-color);
+  animation: enchanted-blink 0.8s ease-in-out infinite;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+}
+
+@keyframes enchanted-blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+/* ===== Status Bar ===== */
+.enchanted-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85em;
+}
+
+.enchanted-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.enchanted-status-indicator.active {
+  background: var(--enchanted-muse-color);
+  box-shadow: 0 0 6px var(--enchanted-muse-color);
+}
+
+.enchanted-status-indicator.whisper-active {
+  background: var(--enchanted-whisper-color);
+  box-shadow: 0 0 6px var(--enchanted-whisper-color);
+}
+
+/* ===== Developer Panel ===== */
+.enchanted-notes-stats {
+  background: var(--background-secondary);
+  border-radius: 6px;
+  padding: 1em;
+  margin: 1em 0;
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+}
+
+.enchanted-notes-stats p {
+  margin: 0.25em 0;
+  color: var(--text-muted);
+}
+
+/* ===== Editor Integration ===== */
+.cm-enchanted-line {
+  position: relative;
+}
+
+/* Prevent muse content from being editable directly */
+.cm-enchanted-muse-content {
+  user-select: none;
+}
+
+/* Loading state */
+.enchanted-loading {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.enchanted-loading::after {
+  content: '...';
+  animation: enchanted-dots 1.5s infinite;
+}
+
+@keyframes enchanted-dots {
+  0%, 20% {
+    content: '.';
+  }
+  40% {
+    content: '..';
+  }
+  60%, 100% {
+    content: '...';
+  }
+}
+
+/* ===== Mood Indicators ===== */
+.enchanted-mood-reflect {
+  --enchanted-muse-color: #8B7EC8;
+}
+
+.enchanted-mood-think {
+  --enchanted-muse-color: #7E9EC8;
+}
+
+.enchanted-mood-plan {
+  --enchanted-muse-color: #7EC88B;
+}
+
+/* ===== Notice styling ===== */
+.enchanted-notice {
+  background: var(--enchanted-glow);
+  border-left: 3px solid var(--enchanted-muse-color);
+}

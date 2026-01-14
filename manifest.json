@@ -1,0 +1,10 @@
+{
+  "id": "enchanted-notes",
+  "name": "Enchanted Notes",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Notes come alive and talk back to you. A thinking partner and writing companion powered by Claude.",
+  "author": "Enchanted Notes",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
