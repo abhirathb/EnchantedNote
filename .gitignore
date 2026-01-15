@@ -1,8 +1,20 @@
-.docs/
+# Dependencies
 node_modules/
+package-lock.json
+
+# Build artifacts
+main.js
+styles.css
+dist/
+
+# Development
+.docs/
 npm-debug.log
-.DS_Store
-.env*
 *.bak
 *.backup
-dist/
+
+# Environment
+.env*
+
+# OS
+.DS_Store
