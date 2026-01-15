@@ -15,22 +15,34 @@ export function registerCommands(
   museMode: MuseMode,
   whisperMode: WhisperMode
 ): void {
-  // Toggle Muse mode
+  // Toggle Muse mode (mutually exclusive with Whisper)
   addCommand({
     id: 'toggle-muse',
     name: 'Toggle Muse',
-    hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'm' }],
+    hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'm' }],
     callback: () => {
+      if (!museMode.isEnabled()) {
+        // Enabling Muse - disable Whisper first
+        if (whisperMode.isEnabled()) {
+          whisperMode.disable();
+        }
+      }
       museMode.toggle();
     },
   });
 
-  // Toggle Whisper mode
+  // Toggle Whisper mode (mutually exclusive with Muse)
   addCommand({
     id: 'toggle-whisper',
     name: 'Toggle Whisper',
-    hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'w' }],
+    hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'w' }],
     callback: () => {
+      if (!whisperMode.isEnabled()) {
+        // Enabling Whisper - disable Muse first
+        if (museMode.isEnabled()) {
+          museMode.disable();
+        }
+      }
       whisperMode.toggle();
     },
   });

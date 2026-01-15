@@ -216,9 +216,16 @@ export class MuseMode {
       const systemPrompt = getSystemPrompt(mood, 'muse');
       const userMessage = this.buildUserMessage(context);
 
-      // Insert placeholder while generating
-      editor.replaceRange('\n\n::muse[...]::  ', editor.offsetToPos(cursorPos));
+      // Find the end of the document to insert the response there
+      const docLength = content.length;
+      const insertPos = editor.offsetToPos(docLength);
 
+      // Insert placeholder at the end of the document
+      editor.replaceRange('\n\n::muse[...]::  ', insertPos);
+
+      // Track the position and length of our placeholder
+      let placeholderStart = docLength + 2; // Account for '\n\n'
+      let currentBlockLength = '::muse[...]::  '.length; // Initial placeholder length including trailing spaces
       let streamedContent = '';
 
       // Generate response with streaming
@@ -228,23 +235,32 @@ export class MuseMode {
         (text) => {
           // Update the placeholder with streaming content
           streamedContent += text;
-          const currentContent = editor.getValue();
+          const newContent = `::muse[${streamedContent}]::`;
 
-          // Find and update the placeholder
-          const placeholderMatch = currentContent.match(/::muse\[([^\]]*)\]::/);
-          if (placeholderMatch) {
-            const matchStart = currentContent.indexOf(placeholderMatch[0]);
-            const matchEnd = matchStart + placeholderMatch[0].length;
-
+          try {
             editor.replaceRange(
-              `::muse[${streamedContent}]::`,
-              editor.offsetToPos(matchStart),
-              editor.offsetToPos(matchEnd)
+              newContent,
+              editor.offsetToPos(placeholderStart),
+              editor.offsetToPos(placeholderStart + currentBlockLength)
             );
+            // Update the length for next iteration
+            currentBlockLength = newContent.length;
+          } catch {
+            // Silently ignore errors during streaming (e.g., if user is editing)
           }
         },
         (fullText) => {
-          // Response complete
+          // Response complete - add newlines and move cursor
+          const finalContent = editor.getValue();
+          const blockEnd = placeholderStart + `::muse[${streamedContent}]::`.length;
+
+          // Add newlines after the block
+          editor.replaceRange('\n\n', editor.offsetToPos(blockEnd));
+
+          // Move cursor to the new line
+          const newCursorPos = editor.offsetToPos(blockEnd + 2);
+          editor.setCursor(newCursorPos);
+
           this.triggerManager.markProcessed(editor.getValue());
         }
       );
@@ -253,12 +269,12 @@ export class MuseMode {
       new Notice(`Muse error: ${error instanceof Error ? error.message : 'Unknown error'}`);
 
       // Remove the placeholder if there was an error
+      // Search from the end of the document where we inserted it
       const currentContent = editor.getValue();
-      const placeholderMatch = currentContent.match(/::muse\[\.\.\.\]::/);
-      if (placeholderMatch) {
-        const matchStart = currentContent.indexOf(placeholderMatch[0]);
-        const matchEnd = matchStart + placeholderMatch[0].length;
-        editor.replaceRange('', editor.offsetToPos(matchStart), editor.offsetToPos(matchEnd));
+      const placeholderPattern = /\n\n::muse\[[^\]]*\]::  $/;
+      const match = currentContent.match(placeholderPattern);
+      if (match && match.index !== undefined) {
+        editor.replaceRange('', editor.offsetToPos(match.index), editor.offsetToPos(match.index + match[0].length));
       }
     } finally {
       this.isGenerating = false;

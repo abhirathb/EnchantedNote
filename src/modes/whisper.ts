@@ -209,14 +209,13 @@ export class WhisperMode {
   }
 
   /**
-   * Find a paragraph to analyze
+   * Find a paragraph to analyze - always picks the last valid paragraph (most recent content)
    */
   private findParagraphToAnalyze(content: string): number | null {
     const paragraphs = content.split(/\n\n+/);
 
-    // Filter out empty paragraphs and those that are just enchantments
-    const validParagraphs: number[] = [];
-    for (let i = 0; i < paragraphs.length; i++) {
+    // Find the last valid paragraph (most recent user content)
+    for (let i = paragraphs.length - 1; i >= 0; i--) {
       const para = paragraphs[i].trim();
       if (
         para.length > 50 && // Meaningful content
@@ -225,24 +224,16 @@ export class WhisperMode {
         !para.startsWith('::whisper[') &&
         !para.startsWith('---') // Skip frontmatter
       ) {
-        validParagraphs.push(i);
+        // Only return if this is different from the last analyzed paragraph
+        if (i !== this.lastParagraphAnalyzed) {
+          return i;
+        }
+        // Same paragraph, no new content to analyze
+        return null;
       }
     }
 
-    if (validParagraphs.length === 0) {
-      return null;
-    }
-
-    // Pick a paragraph that's different from the last one analyzed
-    const candidates = validParagraphs.filter((p) => p !== this.lastParagraphAnalyzed);
-
-    if (candidates.length === 0) {
-      // All paragraphs have been analyzed, pick the last one
-      return validParagraphs[validParagraphs.length - 1];
-    }
-
-    // Pick the last candidate (most recent content)
-    return candidates[candidates.length - 1];
+    return null;
   }
 
   /**
