@@ -2,6 +2,8 @@
 
 An Obsidian plugin where your notes come alive and talk back to you. A thinking partner and writing companion powered by Claude AI or local LLMs via Ollama.
 
+**Warning: This is a vibecoded plugin with on-going manual review. Please report bugs and security issues**
+
 ## Features
 
 - **Muse Mode**: Get inline AI responses that appear directly in your notes as you write
