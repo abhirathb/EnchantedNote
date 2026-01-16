@@ -5,6 +5,11 @@ import { WhisperMode } from './modes/whisper';
 import { stowAllBlocks, revealAllBlocks } from './rendering/muse-decorator';
 import { removeAllEnchantments } from './utils/parser';
 import { Mood } from './types';
+import {
+  getEnchantmentFrontmatter,
+  setEnchantmentFrontmatter,
+  isEnchantEnabled
+} from './utils/frontmatter';
 
 /**
  * Register all plugin commands
@@ -15,6 +20,40 @@ export function registerCommands(
   museMode: MuseMode,
   whisperMode: WhisperMode
 ): void {
+  // Toggle Enchant Mode for current note
+  addCommand({
+    id: 'toggle-enchant',
+    name: 'Toggle Enchant Note',
+    hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'e' }],
+    checkCallback: (checking: boolean) => {
+      const view = app.workspace.getActiveViewOfType(MarkdownView);
+      if (!view || !view.file) {
+        return false;
+      }
+
+      if (!checking) {
+        const file = view.file;
+        const isEnabled = isEnchantEnabled(app, file);
+
+        if (isEnabled) {
+          // Disable enchant mode
+          setEnchantmentFrontmatter(app, file, { enabled: false });
+          new Notice('Enchant mode disabled for this note');
+        } else {
+          // Enable enchant mode with defaults
+          setEnchantmentFrontmatter(app, file, {
+            enabled: true,
+            style: 'muse',
+            mood: 'reflect',
+          });
+          new Notice('Enchant mode enabled! Edit the frontmatter to customize mode and tone.');
+        }
+      }
+
+      return true;
+    },
+  });
+
   // Toggle Muse mode (mutually exclusive with Whisper)
   addCommand({
     id: 'toggle-muse',

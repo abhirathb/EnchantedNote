@@ -6,6 +6,11 @@ import { detectContext, getLinkedNotesContent } from '../detection/context';
 import { isInsideEnchantment, getCleanContent } from '../utils/parser';
 import { getSystemPrompt } from '../moods';
 import { EnchantedNotesSettings, Mood, LLMContext } from '../types';
+import {
+  getEnchantmentFrontmatter,
+  setEnchantmentFrontmatter,
+  isEnchantEnabled
+} from '../utils/frontmatter';
 
 /**
  * Manages Muse mode - inline responses that appear in the note
@@ -164,6 +169,11 @@ export class MuseMode {
       return;
     }
 
+    // Check if enchant mode is enabled for this note
+    if (!isEnchantEnabled(this.app, file)) {
+      return;
+    }
+
     const editor = view.editor;
     const content = editor.getValue();
     const cursor = editor.getCursor();
@@ -188,18 +198,25 @@ export class MuseMode {
     this.isGenerating = true;
 
     try {
-      // Detect context
-      const detectedContext = detectContext(this.app, file, content, this.settings);
+      // Get frontmatter configuration
+      const frontmatter = getEnchantmentFrontmatter(this.app, file);
 
-      // Use mood override if set
-      const mood = this.currentMood !== 'auto' ? this.currentMood : detectedContext.mood;
+      // Use frontmatter mood/style, with fallback to defaults
+      const mood = frontmatter.mood || 'reflect';
+      const style = frontmatter.style || 'muse';
+
+      // Note: Keep the detectContext code path for potential future use
+      // const detectedContext = detectContext(this.app, file, content, this.settings);
+
+      // Use mood override if set via command
+      const finalMood = this.currentMood !== 'auto' ? this.currentMood : mood;
 
       // Build context
       const context: LLMContext = {
         noteContent: content,
         cursorPosition: cursorPos,
-        mood,
-        style: 'muse',
+        mood: finalMood,
+        style: style as 'muse' | 'whisper',
         notePath: file.path,
       };
 
@@ -213,7 +230,7 @@ export class MuseMode {
       }
 
       // Get system prompt and user message
-      const systemPrompt = getSystemPrompt(mood, 'muse');
+      const systemPrompt = getSystemPrompt(finalMood, style as 'muse' | 'whisper');
       const userMessage = this.buildUserMessage(context);
 
       // Find the end of the document to insert the response there
@@ -249,7 +266,7 @@ export class MuseMode {
             // Silently ignore errors during streaming (e.g., if user is editing)
           }
         },
-        (fullText) => {
+        async (fullText) => {
           // Response complete - add newlines and move cursor
           const finalContent = editor.getValue();
           const blockEnd = placeholderStart + `::muse[${streamedContent}]::`.length;
@@ -262,6 +279,13 @@ export class MuseMode {
           editor.setCursor(newCursorPos);
 
           this.triggerManager.markProcessed(editor.getValue());
+
+          // Mark that this note has received its first response
+          if (!frontmatter.hasFirstResponse) {
+            await setEnchantmentFrontmatter(this.app, file, {
+              hasFirstResponse: true,
+            });
+          }
         }
       );
     } catch (error) {
