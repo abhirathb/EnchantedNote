@@ -7,6 +7,11 @@ import { getCleanContent } from '../utils/parser';
 import { getSystemPrompt } from '../moods';
 import { addWhisper, clearAllWhispers } from '../rendering/whisper-widget';
 import { EnchantedNotesSettings, Mood, LLMContext } from '../types';
+import {
+  getEnchantmentFrontmatter,
+  setEnchantmentFrontmatter,
+  isEnchantEnabled
+} from '../utils/frontmatter';
 
 /**
  * Manages Whisper mode - hover/tap annotations that appear as icons
@@ -130,6 +135,11 @@ export class WhisperMode {
       return;
     }
 
+    // Check if enchant mode is enabled for this note
+    if (!isEnchantEnabled(this.app, file)) {
+      return;
+    }
+
     const editor = view.editor;
     const content = editor.getValue();
 
@@ -152,17 +162,24 @@ export class WhisperMode {
     this.isAnalyzing = true;
 
     try {
-      // Detect context
-      const detectedContext = detectContext(this.app, file, content, this.settings);
+      // Get frontmatter configuration
+      const frontmatter = getEnchantmentFrontmatter(this.app, file);
 
-      // Use mood override if set
-      const mood = this.currentMood !== 'auto' ? this.currentMood : detectedContext.mood;
+      // Use frontmatter mood/style, with fallback to defaults
+      const mood = frontmatter.mood || 'reflect';
+      const style = frontmatter.style || 'whisper';
+
+      // Note: Keep the detectContext code path for potential future use
+      // const detectedContext = detectContext(this.app, file, content, this.settings);
+
+      // Use mood override if set via command
+      const finalMood = this.currentMood !== 'auto' ? this.currentMood : mood;
 
       // Build context
       const context: LLMContext = {
         noteContent: content,
-        mood,
-        style: 'whisper',
+        mood: finalMood,
+        style: style as 'muse' | 'whisper',
         notePath: file.path,
       };
 
@@ -177,7 +194,7 @@ export class WhisperMode {
 
       // Get system prompt and user message
       const systemPrompt =
-        getSystemPrompt(mood, 'whisper') +
+        getSystemPrompt(finalMood, style as 'muse' | 'whisper') +
         '\n\nIMPORTANT: Only respond if you have something genuinely useful to observe. If not, respond with exactly "NO_WHISPER" and nothing else.';
       const userMessage = this.buildUserMessage(context);
 
@@ -196,6 +213,13 @@ export class WhisperMode {
         }
 
         this.lastParagraphAnalyzed = paragraphToAnalyze;
+
+        // Mark that this note has received its first response
+        if (!frontmatter.hasFirstResponse) {
+          await setEnchantmentFrontmatter(this.app, file, {
+            hasFirstResponse: true,
+          });
+        }
       }
 
       // Mark content as analyzed
